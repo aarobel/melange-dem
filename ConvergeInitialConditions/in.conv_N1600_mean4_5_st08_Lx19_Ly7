@@ -1,0 +1,77 @@
+# in-file for simulations of N grains within a uniformly shrinking domain.
+# May be used to study jamming phase transition or to prepare initial
+# conditions with desired particle density for subsequent model runs.
+# No bonds. Motionless ocean is the only external forcing (but other forces 
+# may be added easily). Periodic model domain.
+#
+# Run conv01:
+variable        runID  string "conv_N1600_mean4_5_st08_Lx19_Ly7"
+variable        dt     equal  0.002
+variable        dtsnap equal  10*60/${dt}
+variable        dtthrm equal  30/${dt}
+variable        trun1  equal  3600/${dt}
+variable        trun2  equal  5*3600/${dt}
+variable	Lx     equal  19000
+variable        Ly     equal  7000
+variable	xlt    equal  -1*${Lx}/2
+variable        xrt    equal  ${Lx}/2
+variable        ybt    equal  -1*${Ly}/2
+variable        ytp    equal  ${Ly}/2
+
+#===== Initialization:
+
+units           si
+dimension	2
+newton		off
+boundary	p p p
+
+#===== Atom definitions:
+
+atom_style	disk
+pair_style      gran model hertz/stiffness/disk tangential no_history
+read_data       ./conv_N1600_mean4.5_std0.8_Ly7.init
+pair_coeff	* *
+fix             m1 all property/global kn peratomtypepair 1 7e8
+fix             m2 all property/global kt peratomtypepair 1 0.0
+fix             m3 all property/global gamman peratomtypepair 1 1.0
+fix             m4 all property/global gammat peratomtypepair 1 0.0
+fix             m5 all property/global coefficientFriction peratomtypepair 1 0.0
+
+#===== General settings:
+
+neighbor	1.0 nsq
+#neighbor	1.0 bin
+neigh_modify	delay 0 page 100000 one 5000
+timestep	${dt}
+communicate	single vel yes
+
+#===== Forcing-related settings:
+
+fix             f1  all nve/disk
+#fix             f2a all property/global rhoIce   scalar 910.0
+fix             f2b all property/global rhoWater scalar 1025.0
+fix		f2c all seaice/current 0.0 0.0 0.002 0.000
+fix             f3  all enforce2d
+# shrink computational domain:
+fix             converge all deform 100 x final ${xlt} ${xrt} y final ${ybt} ${ytp} units box
+
+#===== Output:
+
+compute         2b all stress/atom pair
+compute         kerot all erotate/disk
+compute         4a all pair/gran/local id force
+fix             fm all ave/atom 1 ${dtsnap} ${dtsnap} vx vy fx fy
+thermo		${dtthrm}
+thermo_style	custom time c_kerot ke pxx pyy pxy lx ly
+thermo_modify   flush yes
+dump		1 all custom 20000000 ./res/${runID}.const id radius mass
+dump		2 all custom ${dtsnap} ./res/${runID}.* id xs ys vx vy omegaz fx fy tqz c_2b[1] c_2b[2] c_2b[4]
+#dump            4 all custom ${dtsnap} ./res/${runID}.*.mean id f_fm[1] f_fm[2] f_fm[3] f_fm[4]
+dump            3 all local  ${dtsnap} ./res/${runID}.*.pairs c_4a[1] c_4a[2] c_4a[4] c_4a[5]
+
+#===== Run:
+
+run             ${trun1}
+# stop the domain shrinking and let the system relax in the final state:
+unfix           converge
+run             ${trun2}
