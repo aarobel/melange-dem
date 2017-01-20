@@ -7,7 +7,7 @@ LFC=0.03
 
 module load matlab
 
-for HSI in 0.1 2 4 6 8 10; do
+for HSI in 1; do
 
 	STRL=$((${STR}/100000))
 	LFCS=$(echo "scale=0; $LFC*1000/1" | bc) 
