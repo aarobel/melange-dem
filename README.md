@@ -1,3 +1,0 @@
-# melange-dem
-
-Public repository currently under construction...
